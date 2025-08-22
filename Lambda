@@ -1,0 +1,41 @@
+trigger: none
+
+schedules:
+  - cron: "*/5 * * * *"   # run every 5 minutes (UTC)
+    displayName: "Test Market Selector"
+    always: true
+    branches:
+      include:
+        - main   # change to your default branch
+
+stages:
+- stage: TestMarket
+  jobs:
+  - job: PrintMarket
+    steps:
+      # Step 1: Select market based on UTC hour
+      - script: |
+          HOUR=$(date -u +"%H")
+          echo "UTC Hour is $HOUR"
+
+          case $HOUR in
+            4) MARKET="KUWAIT" ;;
+            6) MARKET="UNITED_ARAB_EMIRATES" ;;
+            8) MARKET="SAUDI_ARABIA" ;;
+            10) MARKET="EGYPT" ;;
+            12) MARKET="QATAR" ;;
+            14) MARKET="BAHRAIN" ;;
+            16) MARKET="JORDAN" ;;
+            *) MARKET="KUWAIT" ;; # fallback
+          esac
+
+          echo "Market selected: $MARKET"
+
+          # Export MARKET as pipeline variable
+          echo "##vso[task.setvariable variable=MARKET]$MARKET"
+        displayName: "Select and Save Market"
+
+      # Step 2: Print the selected market again
+      - script: |
+          echo "Pipeline variable MARKET is: $(MARKET)"
+        displayName: "Print Saved Market"
