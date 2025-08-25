@@ -1,36 +1,91 @@
 trigger: none
 
 schedules:
-  - cron: "*/5 * * * *"   # run every 5 minutes (UTC)
-    displayName: "Test Market Selector"
+  # Kuwait - 04:00 KWT (01:00 UTC)
+  - cron: "0 1 * * *"
+    displayName: "Run for kuwait"
     always: true
     branches:
       include:
-        - cron/aqa-ui-mcom-app-test-dev   # change to your default branch
+        - cron/aqa-ui-mcom-app-test-dev
+
+  # UAE - 06:00 KWT (03:00 UTC)
+  - cron: "0 3 * * *"
+    displayName: "Run for united_arab_emirates"
+    always: true
+    branches:
+      include:
+        - cron/aqa-ui-mcom-app-test-dev
+
+  # Saudi Arabia - 08:00 KWT (05:00 UTC)
+  - cron: "0 5 * * *"
+    displayName: "Run for saudi_arabia"
+    always: true
+    branches:
+      include:
+        - cron/aqa-ui-mcom-app-test-dev
+
+  # Egypt - 10:00 KWT (07:00 UTC)
+  - cron: "0 7 * * *"
+    displayName: "Run for egypt"
+    always: true
+    branches:
+      include:
+        - cron/aqa-ui-mcom-app-test-dev
+
+  # Qatar - 12:00 KWT (09:00 UTC)
+  - cron: "0 9 * * *"
+    displayName: "Run for qatar"
+    always: true
+    branches:
+      include:
+        - cron/aqa-ui-mcom-app-test-dev
+
+  # Bahrain - 14:00 KWT (11:00 UTC)
+  - cron: "0 11 * * *"
+    displayName: "Run for bahrain"
+    always: true
+    branches:
+      include:
+        - cron/aqa-ui-mcom-app-test-dev
+
+  # Jordan - 16:00 KWT (13:00 UTC)
+  - cron: "0 13 * * *"
+    displayName: "Run for jordan"
+    always: true
+    branches:
+      include:
+        - cron/aqa-ui-mcom-app-test-dev
 
 stages:
 - stage: TestMarket
   jobs:
   - job: PrintMarket
     steps:
-      # Step 1: Select market based on current minute (modulo 7 rotation)
+      # Step 1: Select market based on current UTC hour
       - script: |
-          MINUTE=$(date -u +"%M")
-          echo "UTC Minute is $MINUTE"
+          HOUR=$(date -u +"%H")
+          echo "UTC Hour is $HOUR"
 
-          # Compute index (0–6) based on 5-minute slot
-          INDEX=$(( (10#$MINUTE / 5) % 7 ))
-
-          MARKETS=("kuwait" "united_arab_emirates" "saudi_arabia" "egypt" "qatar" "bahrain" "jordan")
-          market=${MARKETS[$INDEX]}
+          case $HOUR in
+            1) market="kuwait" ;;
+            3) market="united_arab_emirates" ;;
+            5) market="saudi_arabia" ;;
+            7) market="egypt" ;;
+            9) market="qatar" ;;
+            11) market="bahrain" ;;
+            13) market="jordan" ;;
+            *) market="kuwait" ;; # fallback
+          esac
 
           echo "Market selected: $market"
 
-          # Export market as pipeline variable (for later steps)
+          # Export as pipeline variable
           echo "##vso[task.setvariable variable=market]$market"
         displayName: "Select and Save Market"
 
-      # Step 2: Print the selected market again
+      # Step 2: Use the pipeline variable
       - script: |
           echo "Pipeline variable market is: $(market)"
         displayName: "Print Saved Market"
+
