@@ -1,91 +1,142 @@
-trigger: none
+import logging
+import requests
+import azure.functions as func
+from openai import AzureOpenAI
+import traceback
+import base64
 
-schedules:
-  # Kuwait - 04:00 KWT (01:00 UTC)
-  - cron: "0 1 * * *"
-    displayName: "Run for kuwait"
-    always: true
-    branches:
-      include:
-        - cron/aqa-ui-mcom-app-test-dev
+# --- Hardcoded Configuration ---
+AZURE_OPENAI_ENDPOINT = "https://copilot-openai-poc.openai.azure.com/"
+AZURE_OPENAI_KEY = "2bde1df08ad2462c812a6402da38d6e4"
+AZURE_OPENAI_DEPLOYMENT = "gpt-4"
+AZURE_DEVOPS_ORG = "Alshaya-DevOps"
+AZURE_DEVOPS_PROJECT = "Mha_Alshaya_AgenticAI_Poc"
+REPO_ID = "716fc091-6a27-4670-8a04-67de9b003a0b"
+PAT = "Df2kp1e6K7Q4gokpDCh4slaBN9xEf2lQNSjnz16m6WdnZTfNJ8QSJQQJ99BGACAAAAAbFsp6AAASAZDO1PoN"
 
-  # UAE - 06:00 KWT (03:00 UTC)
-  - cron: "0 3 * * *"
-    displayName: "Run for united_arab_emirates"
-    always: true
-    branches:
-      include:
-        - cron/aqa-ui-mcom-app-test-dev
+# Initialize Azure OpenAI client
+client = AzureOpenAI(
+    api_key=AZURE_OPENAI_KEY,
+    api_version="2024-02-15-preview",
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+)
 
-  # Saudi Arabia - 08:00 KWT (05:00 UTC)
-  - cron: "0 5 * * *"
-    displayName: "Run for saudi_arabia"
-    always: true
-    branches:
-      include:
-        - cron/aqa-ui-mcom-app-test-dev
+def get_basic_auth_header():
+    token = base64.b64encode(f":{PAT}".encode()).decode()
+    return {"Authorization": f"Basic {token}"}
 
-  # Egypt - 10:00 KWT (07:00 UTC)
-  - cron: "0 7 * * *"
-    displayName: "Run for egypt"
-    always: true
-    branches:
-      include:
-        - cron/aqa-ui-mcom-app-test-dev
+def get_pr_commit_id(pr_id):
+    logging.info(f"Retrieving commit ID for PR ID: {pr_id}")
+    url = f"https://dev.azure.com/{AZURE_DEVOPS_ORG}/{AZURE_DEVOPS_PROJECT}/_apis/git/repositories/{REPO_ID}/pullRequests/{pr_id}?api-version=7.1-preview.1"
+    headers = get_basic_auth_header()
+    resp = requests.get(url, headers=headers)
+    
+    if resp.status_code != 200:
+        logging.error(f"Failed to get PR info: {resp.status_code} - {resp.text}")
+        return None
+    
+    pr_json = resp.json()
+    commit_id = pr_json.get("lastMergeSourceCommit", {}).get("commitId")
+    logging.info(f"PR {pr_id} commit ID: {commit_id}")
+    return commit_id
 
-  # Qatar - 12:00 KWT (09:00 UTC)
-  - cron: "0 9 * * *"
-    displayName: "Run for qatar"
-    always: true
-    branches:
-      include:
-        - cron/aqa-ui-mcom-app-test-dev
+def get_changed_files(pr_id):
+    logging.info(f"Retrieving changed files for PR ID: {pr_id}")
+    headers = get_basic_auth_header()
+    url = f"https://dev.azure.com/{AZURE_DEVOPS_ORG}/{AZURE_DEVOPS_PROJECT}/_apis/git/repositories/{REPO_ID}/pullRequests/{pr_id}/iterations?api-version=7.1-preview.1"
+    resp = requests.get(url, headers=headers)
+    
+    if resp.status_code != 200:
+        logging.error(f"Failed to get PR iterations: {resp.status_code} - {resp.text}")
+        return []
+    
+    iterations = resp.json().get("value", [])
+    if not iterations:
+        logging.warning("No iterations found for PR.")
+        return []
 
-  # Bahrain - 14:00 KWT (11:00 UTC)
-  - cron: "0 11 * * *"
-    displayName: "Run for bahrain"
-    always: true
-    branches:
-      include:
-        - cron/aqa-ui-mcom-app-test-dev
+    last_iteration_id = iterations[-1]["id"]
+    logging.info(f"Last iteration ID: {last_iteration_id}")
+    
+    url_changes = f"https://dev.azure.com/{AZURE_DEVOPS_ORG}/{AZURE_DEVOPS_PROJECT}/_apis/git/repositories/{REPO_ID}/pullRequests/{pr_id}/iterations/{last_iteration_id}/changes?api-version=7.1-preview.1"
+    resp_changes = requests.get(url_changes, headers=headers)
+    
+    if resp_changes.status_code != 200:
+        logging.error(f"Failed to get iteration changes: {resp_changes.status_code} - {resp_changes.text}")
+        return []
+    
+    changes = resp_changes.json().get("changes", [])
+    changed_files = []
+    for change in changes:
+        path = change.get("item", {}).get("path")
+        if path:
+            changed_files.append(path)
+            logging.info(f"Changed file: {path}")
+    
+    logging.info(f"Total changed files: {len(changed_files)}")
+    return changed_files
 
-  # Jordan - 16:00 KWT (13:00 UTC)
-  - cron: "0 13 * * *"
-    displayName: "Run for jordan"
-    always: true
-    branches:
-      include:
-        - cron/aqa-ui-mcom-app-test-dev
+def fetch_file_content(file_path, commit_id):
+    logging.info(f"Fetching content for file: {file_path} at commit ID: {commit_id}")
+    headers = get_basic_auth_header()
+    url = (
+        f"https://dev.azure.com/{AZURE_DEVOPS_ORG}/{AZURE_DEVOPS_PROJECT}/_apis/git/repositories/"
+        f"{REPO_ID}/items?path={file_path}&versionDescriptor.version={commit_id}&includeContent=true&api-version=7.1-preview.1"
+    )
+   
+    resp = requests.get(url, headers=headers)
+    
+    if resp.status_code != 200:
+        logging.error(f"Failed to fetch file content: {resp.status_code} - {resp.text}")
+        return None
+    
+    file_content = resp.json().get("content")
+    logging.info(f"Fetched content for file: {file_path}")
+    return file_content
 
-stages:
-- stage: TestMarket
-  jobs:
-  - job: PrintMarket
-    steps:
-      # Step 1: Select market based on current UTC hour
-      - script: |
-          HOUR=$(date -u +"%H")
-          echo "UTC Hour is $HOUR"
+def process_pr(pr_id):
+    logging.info(f"Processing PR ID: {pr_id}")
+    
+    commit_id = get_pr_commit_id(pr_id)
+    if not commit_id:
+        logging.error("No commit ID found, aborting process.")
+        return
+    
+    changed_files = get_changed_files(pr_id)
+    if not changed_files:
+        logging.error("No changed files found, aborting process.")
+        return
+    
+    for file_path in changed_files:
+        content = fetch_file_content(file_path, commit_id)
+        if content:
+            # Here you can process the content with Azure OpenAI
+            response = client.completions.create(
+                deployment_id=AZURE_OPENAI_DEPLOYMENT,
+                prompt=content,
+                max_tokens=150,
+                temperature=0.7
+            )
+            logging.info(f"OpenAI response for file {file_path}: {response.choices[0].text.strip()}")
 
-          case $HOUR in
-            1) market="kuwait" ;;
-            3) market="united_arab_emirates" ;;
-            5) market="saudi_arabia" ;;
-            7) market="egypt" ;;
-            9) market="qatar" ;;
-            11) market="bahrain" ;;
-            13) market="jordan" ;;
-            *) market="kuwait" ;; # fallback
-          esac
-
-          echo "Market selected: $market"
-
-          # Export as pipeline variable
-          echo "##vso[task.setvariable variable=market]$market"
-        displayName: "Select and Save Market"
-
-      # Step 2: Use the pipeline variable
-      - script: |
-          echo "Pipeline variable market is: $(market)"
-        displayName: "Print Saved Market"
-
+def main(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("Function triggered.")
+    pr_id = req.params.get('pr_id')
+    
+    if not pr_id:
+        logging.error("PR ID is missing in the query string.")
+        return func.HttpResponse(
+            "Please pass a PR ID in the query string.",
+            status_code=400
+        )
+    
+    try:
+        logging.info(f"Processing PR ID: {pr_id}")
+        process_pr(pr_id)
+        return func.HttpResponse(f"Processed PR ID: {pr_id}", status_code=200)
+    except Exception as e:
+        logging.error(f"Error processing PR: {str(e)}")
+        return func.HttpResponse(
+            "An error occurred while processing the PR.",
+            status_code=500
+        )
