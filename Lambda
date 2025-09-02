@@ -6,13 +6,13 @@ import traceback
 import base64
 
 # --- Hardcoded Configuration ---
-AZURE_OPENAI_ENDPOINT = "https://copilot-openai-poc.openai.azure.com/"
-AZURE_OPENAI_KEY = "2bde1df08ad2462c812a6402da38d6e4"
+AZURE_OPENAI_ENDPOINT = ""
+AZURE_OPENAI_KEY = ""
 AZURE_OPENAI_DEPLOYMENT = "gpt-4"
-AZURE_DEVOPS_ORG = "Alshaya-DevOps"
-AZURE_DEVOPS_PROJECT = "Mha_Alshaya_AgenticAI_Poc"
-REPO_ID = "716fc091-6a27-4670-8a04-67de9b003a0b"
-PAT = "Df2kp1e6K7Q4gokpDCh4slaBN9xEf2lQNSjnz16m6WdnZTfNJ8QSJQQJ99BGACAAAAAbFsp6AAASAZDO1PoN"
+AZURE_DEVOPS_ORG = "
+AZURE_DEVOPS_PROJECT = "Mc"
+REPO_ID = ""
+PAT = 
 
 # Initialize Azure OpenAI client
 client = AzureOpenAI(
