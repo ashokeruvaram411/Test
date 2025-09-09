@@ -1,0 +1,17 @@
+newrelic-infrastructure:
+  enabled: true
+  integrations:
+    - name: rabbitmq-config.yaml
+      data: |
+        integrations:
+          - name: nri-rabbitmq
+            env:
+              HOSTNAME: rabbitmq-qa-cluster
+              PORT: 15672
+              USERNAME: default_user_RpQ1onXZlY9RAg_lhCc
+              PASSWORD: uVfsszTw1-IENu5UpgfpJ1n76h-KgHUN
+              METRICS: true
+              DISABLE_ENTITIES: true
+
+infrastructure:
+  enabled: true
