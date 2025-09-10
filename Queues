@@ -1,0 +1,32 @@
+rabbitmq-config.yml: |
+  ---
+  discovery:
+    command:
+      exec: /var/db/newrelic-infra/nri-discovery-kubernetes
+      match:
+        label.app: rabbitmq
+  integrations:
+    - name: nri-rabbitmq
+      env:
+        HOSTNAME: ${discovery.ip}
+        PORT: 15672
+        USERNAME: myuser
+        PASSWORD: mypassword
+        NODE_NAME_OVERRIDE: rabbit@${discovery.podName}.rabbitmq-headless.${discovery.namespace}.svc.cluster.local
+
+        # Queue filters
+        QUEUES: '["process.variant.sku","creditmemo.create","coms.inventory.snapshot"]'
+        QUEUES_REGEXES: '["^order\\..*","^alshaya-.*","^feed\\.queue\\..*"]'
+
+        # Vhost filters
+        VHOSTS: '["mc-qa","mc-uat","All","mc-sanity"]'
+        # OR
+        # VHOSTS_REGEXES: '["^mc-.*","^All$"]'
+
+        # Exchange filters
+        EXCHANGES: '["custom.exchange","priority.exchange"]'
+        EXCHANGES_REGEXES: '["^amq\\..*","^events-.*"]'
+
+      labels:
+        env: production
+        role: rabbitmq
